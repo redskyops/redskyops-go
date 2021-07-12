@@ -39,6 +39,23 @@ type httpAPI struct {
 
 var _ API = &httpAPI{}
 
+func (h *httpAPI) CheckEndpoint(ctx context.Context) (api.Metadata, error) {
+	req, err := http.NewRequest(http.MethodHead, h.client.URL(endpointApplications).String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, body, err := h.client.Do(ctx, req)
+	switch {
+	case api.IsUnauthorized(err):
+		return nil, err
+	case err != nil:
+		return nil, api.NewUnexpectedError(resp, body)
+	default:
+		return api.Metadata(resp.Header), nil
+	}
+}
+
 func (h *httpAPI) ListApplications(ctx context.Context, q ApplicationListQuery) (ApplicationList, error) {
 	u := h.client.URL(endpointApplications)
 	u.RawQuery = url.Values(q.IndexQuery).Encode()

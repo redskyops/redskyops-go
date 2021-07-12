@@ -40,6 +40,9 @@ type Server struct {
 
 // API provides bindings for the supported endpoints
 type API interface {
+	// CheckEndpoint verifies we can talk to the backend.
+	CheckEndpoint(ctx context.Context) (api.Metadata, error)
+	// Deprecated, callers should use CheckEndpoint(ctx) instead
 	Options(context.Context) (Server, error)
 
 	GetAllExperiments(context.Context, ExperimentListQuery) (ExperimentList, error)

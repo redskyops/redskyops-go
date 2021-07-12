@@ -41,33 +41,33 @@ type httpAPI struct {
 
 var _ API = &httpAPI{}
 
-func (h *httpAPI) Options(ctx context.Context) (Server, error) {
-	u := h.client.URL(endpointExperiments).String()
-	s := Server{}
-
-	req, err := http.NewRequest(http.MethodOptions, u, nil)
+func (h *httpAPI) CheckEndpoint(ctx context.Context) (api.Metadata, error) {
+	req, err := http.NewRequest(http.MethodHead, h.client.URL(endpointExperiments).String(), nil)
 	if err != nil {
-		return s, err
+		return nil, err
 	}
-
-	// We actually want to do OPTIONS for the whole server, now that the host:port has been captured, overwrite the RequestURL
-	// TODO This isn't working because of backend configuration issues
-	// req.URL.Opaque = "*"
 
 	resp, body, err := h.client.Do(ctx, req)
+	switch {
+	case api.IsUnauthorized(err):
+		return nil, err
+	case err != nil:
+		return nil, api.NewUnexpectedError(resp, body)
+	default:
+		return api.Metadata(resp.Header), nil
+	}
+}
+
+func (h *httpAPI) Options(ctx context.Context) (Server, error) {
+	s := Server{}
+
+	md, err := h.CheckEndpoint(ctx)
 	if err != nil {
 		return s, err
 	}
 
-	switch resp.StatusCode {
-	case http.StatusOK, http.StatusNoContent,
-		// TODO Current behavior is to return 404 or 405 instead of 204 (or 200?)
-		http.StatusNotFound, http.StatusMethodNotAllowed:
-		s.Metadata = api.Metadata(resp.Header)
-		return s, nil
-	default:
-		return s, api.NewUnexpectedError(resp, body)
-	}
+	s.Metadata = md
+	return s, nil
 }
 
 func (h *httpAPI) GetAllExperiments(ctx context.Context, q ExperimentListQuery) (ExperimentList, error) {
